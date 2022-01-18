@@ -1,4 +1,4 @@
-const fs = require('graceful-fs')
+const fs = require('fs-extra')
 const Base = require('./Base')
 
 const readFile = fs.readFileSync

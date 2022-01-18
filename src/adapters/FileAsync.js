@@ -1,6 +1,6 @@
 // Not using async/await on purpose to avoid adding regenerator-runtime
 // to lowdb dependencies
-const fs = require('graceful-fs')
+const fs = require('fs-extra')
 const pify = require('pify')
 const steno = require('steno')
 const Base = require('./Base')
@@ -9,27 +9,26 @@ const readFile = pify(fs.readFile)
 const writeFile = pify(steno.writeFile)
 
 class FileAsync extends Base {
-  read() {
+  async read() {
     // fs.exists is deprecated but not fs.existsSync
-    if (fs.existsSync(this.source)) {
-      // Read database
-      return readFile(this.source, 'utf-8')
-        .then(data => {
-          // Handle blank file
-          const trimmed = data.trim()
-          return trimmed ? this.deserialize(trimmed) : this.defaultValue
-        })
-        .catch(e => {
-          if (e instanceof SyntaxError) {
-            e.message = `Malformed JSON in file: ${this.source}\n${e.message}`
-          }
-          throw e
-        })
-    } else {
+    try {
+      await fs.ensureFile(this.source)
+
+      try {
+        const data = await readFile(this.source, 'utf-8')
+        // Handle blank file
+        const trimmed = data.trim()
+        return trimmed ? this.deserialize(trimmed) : this.defaultValue
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          e.message = `Malformed JSON in file: ${this.source}\n${e.message}`
+        }
+        throw e
+      }
+    } catch (err) {
       // Initialize
-      return writeFile(this.source, this.serialize(this.defaultValue)).then(
-        () => this.defaultValue
-      )
+      await writeFile(this.source, this.serialize(this.defaultValue))
+      return this.defaultValue
     }
   }
 
