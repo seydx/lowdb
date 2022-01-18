@@ -9,27 +9,29 @@ const readFile = pify(fs.readFile)
 const writeFile = pify(steno.writeFile)
 
 class FileAsync extends Base {
-  async read() {
+  read() {
     // fs.exists is deprecated but not fs.existsSync
-    try {
-      await fs.ensureFile(this.source)
-
-      try {
-        const data = await readFile(this.source, 'utf-8')
-        // Handle blank file
-        const trimmed = data.trim()
-        return trimmed ? this.deserialize(trimmed) : this.defaultValue
-      } catch (e) {
-        if (e instanceof SyntaxError) {
-          e.message = `Malformed JSON in file: ${this.source}\n${e.message}`
-        }
-        throw e
-      }
-    } catch (err) {
-      // Initialize
-      await writeFile(this.source, this.serialize(this.defaultValue))
-      return this.defaultValue
-    }
+    return fs
+      .ensureFile(this.source)
+      .then(() => {
+        return readFile(this.source, 'utf-8')
+          .then(data => {
+            // Handle blank file
+            const trimmed = data.trim()
+            return trimmed ? this.deserialize(trimmed) : this.defaultValue
+          })
+          .catch(e => {
+            if (e instanceof SyntaxError) {
+              e.message = `Malformed JSON in file: ${this.source}\n${e.message}`
+            }
+            throw e
+          })
+      })
+      .catch(() => {
+        return writeFile(this.source, this.serialize(this.defaultValue)).then(
+          () => this.defaultValue
+        )
+      })
   }
 
   write(data) {
